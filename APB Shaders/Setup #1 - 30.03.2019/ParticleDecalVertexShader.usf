@@ -1,0 +1,32 @@
+/***************************************************************************************/
+/*! \file ParticleDecalVertexShader.usf
+*
+* \brief Vertex shader for fake decal particles.
+*
+* \b NOW_OWNER: DW    24/10/2008 <BR>
+*
+* (c) 2008 Real Time Worlds Ltd.
+****************************************************************************************/
+
+#include "Common.usf"
+
+// Model space -> world space matrix.
+float4x4 LocalToWorld;
+
+// Entry point.
+void Main(
+	in float4 InPosition : POSITION,
+	out float4 OutPosition : POSITION,
+	out float4 OutScreenVector : TEXCOORD0,
+	out float4 OutScreenPosition : TEXCOORD1
+	)
+{
+	// Move model-space position from vb to world-space
+	float4 WorldPosition = MulMatrix(LocalToWorld, InPosition);
+
+	// compute screenspace position
+	OutScreenPosition = OutPosition = MulMatrix(ViewProjectionMatrix, WorldPosition);
+
+	// World-space camera vector for computing world position in the pixel shader.
+	OutScreenVector = WorldPosition - CameraPosition;
+}

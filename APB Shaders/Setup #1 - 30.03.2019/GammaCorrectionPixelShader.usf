@@ -1,0 +1,25 @@
+/*=============================================================================
+	GammaCorrectionPixelShader.usf: Pixel shader for gamma correcting the scene color buffer.
+	Copyright 1998-2008 Epic Games, Inc. All Rights Reserved.
+=============================================================================*/
+
+#include "Common.usf"
+
+half3 ColorScale;
+half4 OverlayColor;
+half InverseGamma;
+
+void Main(
+	in float2 UV : TEXCOORD0,
+	out float4 OutColor : COLOR0
+	)
+{
+	/* APB - Ant - Modified to preserve alpha channel from source texture (need by the UI to render meshes with transparent backgrounds inside UI widgets)
+	 * half3 LinearColor = lerp( tex2D(SceneColorTexture,UV).rgb * ColorScale,OverlayColor.rgb,OverlayColor.a);
+	 * OutColor = float4(pow(saturate(LinearColor),InverseGamma),1);
+	 */
+	half4 TexColor = tex2D(SceneColorTexture,UV);
+	half3 LinearColor = lerp( TexColor.rgb * ColorScale,OverlayColor.rgb,OverlayColor.a);
+	OutColor = float4(pow(saturate(LinearColor),InverseGamma),TexColor.a);
+	// RETURN_COLOR not needed unless writing to SceneColor
+}

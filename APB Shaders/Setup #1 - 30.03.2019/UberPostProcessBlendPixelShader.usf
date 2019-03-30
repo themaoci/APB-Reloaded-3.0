@@ -1,0 +1,69 @@
+/*=============================================================================
+	DOFAndBloomBlendPixelShader.usf: Pixel shader for blending the blurred depth of field and bloom colors with the scene color.
+	Copyright 1998-2008 Epic Games, Inc. All Rights Reserved.
+=============================================================================*/
+
+#include "Common.usf"
+#include "PostProcessCommon.usf"
+#include "DepthOfFieldCommon.usf"
+
+sampler2D BlurredImage;
+
+#if USE_TONEMAP_AND_COLORGRADING
+sampler2D ColorGradingLUT;
+#endif // USE_TONEMAP_AND_COLORGRADING
+
+
+
+/*=============================================================================
+ * Pixel Shader
+ *============================================================================*/
+
+void Main(
+	in float2 UV : TEXCOORD0,
+	in float2 SceneUV : TEXCOORD1,
+	out float4 OutColor : COLOR0
+	)
+{
+    // DOF and bloom effect
+
+	//focused scene color in rgb, depth in a
+	half4 FocusedSceneColorAndDepth = CalcSceneColorAndDepth(SceneUV);
+	half  FocusedWeight = saturate(1 - CalcUnfocusedPercent(FocusedSceneColorAndDepth.a));
+
+	//UnfocusedSceneColor in .rgb, UnfocusedWeight in .a
+	//Scale color back up as it was compressed to the [0-1] range to fit in the fixed point filter buffer
+	half4 UnfocusedSceneColorAndWeight = MAX_SCENE_COLOR * tex2D(BlurredImage,UV);
+
+//	half  WeightSum = max(FocusedWeight + UnfocusedSceneColorAndWeight.a, 0.001);
+    half  WeightSum = FocusedWeight + UnfocusedSceneColorAndWeight.a;
+
+    half3 DOFResult = (FocusedSceneColorAndDepth.rgb * FocusedWeight + UnfocusedSceneColorAndWeight.rgb) / WeightSum;
+
+    // Material effect
+
+#if USE_TONEMAP_AND_COLORGRADING
+	// tonemapper with color grading, deactiavtes the soft clamp - active when a texture is specified in the active PostProcessVolume
+	half3 LinearColor = DOFResult;
+
+	// simple but effective tonemapper (includes gamma correction)
+	half3 GammaColor = LinearColor / (LinearColor + 0.187f) * 1.035f;
+
+	// color grading based on 3D color LUT, also do linear to gamma conversion
+	// line can be commented out to see it without color grading 
+	// also includes ColorCorrection() (SceneShadows, MidTones, Highlights, Desaturation)
+	GammaColor = ColorLookupTable(ColorGradingLUT, GammaColor);
+
+	// D3D10 does some magic with gamma, without it it would appear to bright
+#if SM4_PROFILE
+	// max() clamp to get nice behavior for negative colors (see level sm2test)
+	GammaColor = UnClampedPow(max(SmallPowConst, GammaColor), 2.2f * GammaInverse);
+#endif
+
+	OutColor = RETURN_COLOR( float4(GammaColor, 0.f) );
+#else
+	half3 LinearColor = ColorCorrection(DOFResult);
+	
+	OutColor = RETURN_COLOR( float4(pow(saturate(LinearColor), GammaInverse), 0.f) );
+#endif
+}

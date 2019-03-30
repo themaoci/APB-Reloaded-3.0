@@ -1,0 +1,50 @@
+   /*===================================================================/
+  /========= Made by TheMaoci, KyoukiDotExe( ChijiruDotExe ) ==========/
+ /===================================================================*/
+/** INFO **/
+// 1 - ON 
+// 0 - OFF
+/** Working Section **/
+//Version - mostly for tonemap
+#define RTW_ON 1 // 1 - ON 0 - OFF
+#define RTW_BLOOMINGNESS 0.2f // default for rtw was 3.5f
+#define DOPE_ON 0 // 1 - ON 0 - OFF
+
+/** FOG SECTION **/
+#define SET_FOG 1			// 0 will remove distance fog. (1 by default) == OLD METHOD
+#define FOG_DISTANCE 100.0	// distance in [m] - its for default fog
+#define SET_NOFOG_KYOUKI 0	// 1 will remove distance fog. 0 default
+// luminance vector RGB
+#define LUMINANCE_V_RTW float3(0.3, 0.59, 0.11)	// SET RTW LUMINANCE
+#define LUMINANCE_V 	float3(0.3, 0.3, 0.2)	// 1 will remove distance fog. 0 default
+
+
+/** BLOOM SECTION **/
+#define SEPARATE_BLOOM 1	// use separate bloom
+#define SET_BLOOM_KYOUKI 0	// special Kyouki bloom without actual bloom and bof effect
+
+/** CROSSHAIR SECTION **/
+#define SET_CROSSHAIR 1		// Enable the crosshair shader. Additional changes have to be done in the CrosshairSettings.usf file. (0 by default)
+
+/** OUTLINE SECTION **/
+#define SET_OUTLINE 0		// Enable the outline shader. Additional changes have to be done in the OutlinePixelShaderSettings.usf file. (0 by default)
+
+
+
+/** Inprogress Section **/
+//#define SET_BLOOM 1 		// Bloom: 1 = On, 0 = Off
+//#define SET_NOBLOOM 1 	// Bloom test new value
+
+// Colorgrading, 0 will remove the blue tint color grading. (1 by default)
+//#define SET_COLORGRADING 0
+// if statements = 1
+// else = 0
+
+/** changes **\
+// New nofogging method, compelely removes fog and does not reduce fps.
+// added RTW setup with blooming settings to tweak it to ur needs
+// dopefish tonemap :)
+
+
+
+*/

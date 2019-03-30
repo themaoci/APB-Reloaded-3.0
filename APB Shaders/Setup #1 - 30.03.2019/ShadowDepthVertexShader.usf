@@ -1,0 +1,24 @@
+/*=============================================================================
+	ShadowDepthVertexShader.hlsl: Vertex shader for writing shadow depth.
+	Copyright 1998-2008 Epic Games, Inc. All Rights Reserved.
+=============================================================================*/
+
+#include "Common.usf"
+#include "Material.usf"
+#include "VertexFactory.usf"
+
+float4x4 ShadowMatrix;
+float4x4 ProjectionMatrix;
+
+void Main(
+	FVertexFactoryInput FactoryInput,
+	out FVertexFactoryInterpolants OutInterpolants,
+	out float4 OutShadowPosition : TEXCOORD7,
+	out float4 OutPosition : POSITION
+	)
+{
+	float4 WorldPosition = VertexFactoryGetWorldPosition(FactoryInput);
+	OutPosition = MulMatrix(ProjectionMatrix,WorldPosition);
+	OutShadowPosition = MulMatrix(ShadowMatrix,WorldPosition);
+	OutInterpolants = VertexFactoryGetInterpolants(FactoryInput);
+}

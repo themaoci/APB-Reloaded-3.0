@@ -1,0 +1,44 @@
+/*=============================================================================
+	DepthOnlyPixelShader.hlsl: Depth-only pixel shader.
+	Copyright 1998-2008 Epic Games, Inc. All Rights Reserved.
+=============================================================================*/
+
+#include "Common.usf"
+#include "Material.usf"
+#include "VertexFactory.usf"
+
+void Main(
+#if !MATERIALBLENDING_SOLID
+	FVertexFactoryInterpolants FactoryInterpolants,
+	float3 CameraVector : TEXCOORD4,
+// APB(SJT): Always pass the pixel position, as we need it for the screen depth +
+#endif
+	float4 PixelPosition : TEXCOORD5,
+#if !MATERIALBLENDING_SOLID
+// APB(SJT) -
+	OPTIONAL_FacingSign
+#endif
+	out float4 OutColor : COLOR0
+	)
+{
+#if !MATERIALBLENDING_SOLID
+	FMaterialParameters MaterialParameters = GetMaterialParameters(FactoryInterpolants);
+	CalcMaterialParameters(MaterialParameters, FacingSign, CameraVector, PixelPosition);
+	GetMaterialClipping(MaterialParameters);
+#endif
+
+// APB(SJT) +
+#if !MATERIALBLENDING_SOLID
+	float Depth = MaterialParameters.ScreenPosition.w;
+#else
+	float Depth = PixelPosition.w;
+#endif
+
+	//! The lit base pass requires depths in the alpha channel from the depth pass.
+	OutColor = RETURN_COLOR(float4(0,0,0, Depth * ALPHA_DEPTH_SCALE_FACTOR));
+
+/*
+	OutColor = 0;
+*/
+// APB(SJT) -
+}

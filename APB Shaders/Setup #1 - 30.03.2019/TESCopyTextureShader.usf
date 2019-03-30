@@ -1,0 +1,33 @@
+/***************************************************************************************
+ * TESCopyTextureShader.usf
+ * ------------------------
+ *
+ * Texture copy shaders
+ *
+ * OWNER: Maurizio Sciglio 26/08/2009
+ *
+ * ---Amendments-----
+ *
+ * (c) 2009 Real Time Worlds, Ltd.
+ ****************************************************************************************/
+
+sampler2D	SourceTexture;
+
+void vertexShader(
+	in float4 InPosition : POSITION,
+	in float2 InTexCoord : TEXCOORD0,
+	out float2 OutTexCoord : TEXCOORD0,
+	out float4 OutPosition : POSITION
+	)
+{
+	OutPosition = InPosition;
+	OutTexCoord = InTexCoord;
+}
+
+void pixelShader(
+	in float2 UV : TEXCOORD0,
+	out float4 OutColor : COLOR0
+	)
+{
+	OutColor = tex2D(SourceTexture, UV);	
+}

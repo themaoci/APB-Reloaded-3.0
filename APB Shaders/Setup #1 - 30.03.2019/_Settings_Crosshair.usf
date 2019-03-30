@@ -1,0 +1,39 @@
+/***************************************************************************************/
+/*! \file _Settings_Crosshair.usf
+* 
+* Configuration options for dot crosshair
+* 
+*
+* DONT FORGET TO EDIT SCREEN_SIZE_X and SCREEN_SIZE_Y 
+*
+* IF THE GAME CRASHES CROSSHAIR_SIZE IS WAY TOO BIG!
+****************************************************************************************/
+
+{
+// 1 = enable 
+#define ENABLE_CROSSHAIR 1
+#define ENABLE_CROSSHAIR_DOT_1 1
+#define ENABLE_CROSSHAIR_DOT_2 0
+
+// Dont forget to end ressolution with: .0 - move it to Settings.usf
+#define SCREEN_SIZE_X 1024.0
+#define SCREEN_SIZE_Y 768.0
+
+
+// Limit the area at the center to check where to draw the crosshair. We dont want to run on every pixel do we?
+// Set it bigger if your crosshair gets cutoff
+// 0.0-100.0 where 100 means scan 100% of the screen
+#define CROSSHAIR_PIXEL_SCAN_LIMIT 8.0
+
+
+// Dot 1 shape settings
+#define CROSSHAIR_DOT_1_SIZE .8
+
+#define IN_CROSSHAIR_DOT_1_COLOR float4( 0.0, 1.0, 0.0, 0.5) // R, G, B, Alpha with a range of 0.0 to 1.0 Insides
+#define OUT_CROSSHAIR_DOT_1_COLOR float4(0.0, 0.0, 0.0, 0.75) // R, G, B, Alpha with a range of 0.0 to 1.0 Outsides
+#define IN_CROSSHAIR_DOT_1_DYNAMIC_COLOR 0 	// inverse color of background ignores rgb
+#define OUT_CROSSHAIR_DOT_1_DYNAMIC_COLOR 0	// inverse color of background ignores rgb
+
+// Blizzie dot shape settings (strange dot)
+#define CROSSHAIR_DOT_2_COLOR float4(1.0, 0.0, 0.0, 0.75) // R, G, B, Alpha with a range of 0.0 to 1.0
+}

@@ -1,0 +1,43 @@
+/***************************************************************************************
+ * TESUVMaskShader.usf
+ * -------------------
+ *
+ * Shaders used to generate the UV layout mask
+ *
+ * OWNER: Maurizio Sciglio 15/07/2009
+ *
+ * ---Amendments-----
+ *
+ * (c) 2009 Real Time Worlds, Ltd.
+ ****************************************************************************************/
+
+#include "Common.usf"
+#include "Material.usf"
+#include "VertexFactory.usf"
+
+struct vertexShaderOutput
+{
+	float4		Position				: POSITION;		
+	FVertexFactoryInterpolants  OutFactoryInterpolants;
+};
+
+vertexShaderOutput vertexShader(FVertexFactoryInput Input)
+{
+	vertexShaderOutput Result = (vertexShaderOutput)0;
+	
+	// Vertex position in texture space
+	Result.Position = float4( Input.TexCoords[0].x * 2.0f - 1.0f, 
+	                        -(Input.TexCoords[0].y * 2.0f - 1.0f), 
+	                          0.0f, 
+	                          1.0f);
+
+	return Result;
+}
+
+
+float4 pixelShader(FVertexFactoryInterpolants FactoryInterpolants) : COLOR0
+{
+	FMaterialParameters MaterialParameters = GetMaterialParameters(FactoryInterpolants);
+	
+	return float4(1,1,1,1);	
+}

@@ -1,0 +1,83 @@
+/*=============================================================================
+	PostprocessCommon.hlsl: Common shader code.
+	Copyright 1998-2010 Epic Games, Inc. All Rights Reserved.
+=============================================================================*/
+
+
+// scene material parameters
+
+float4 SceneShadowsAndDesaturation;  // RGB = SceneShadows, A = (1-SceneDesaturation)
+float4 SceneInverseHighLights;       // RGB = 1 / SceneHighLights
+float4 SceneMidTones;                // RGB = SceneMidTones
+float4 SceneScaledLuminanceWeights;  // RGB = LuminanceWeights * SceneDesaturation
+
+static float3 SceneShadows      = SceneShadowsAndDesaturation.rgb;
+static float  SceneDesaturation = SceneShadowsAndDesaturation.a;
+
+// gamma correction parameters
+
+float4 GammaColorScaleAndInverse;
+float4 GammaOverlayColor;
+// width, height, 1.0/width, 1.0/height useful to access neighbor pixels (useful for Sharpen/SoftEdge)
+float4 RenderTargetExtent;          
+
+static float3 GammaColorScale = GammaColorScaleAndInverse.rgb; 
+static float  GammaInverse    = GammaColorScaleAndInverse.a;
+
+
+
+
+
+//   ideally there should be no need for the max but as pow(x,y) is implemented as exp2(log2(x)*y) 0 is not defined
+//   the pow with 0.000001f made black appear grey so locally we use a smaller value. Later we can try to get rid of the max
+//   or use the smaller value in other places as well.
+static float SmallPowConst = 0.00000001f;
+
+// @param InLDRColor needs to be LDR (0..1) and in linear space
+half3 ColorCorrection(half3 InLDRColor)
+{
+    half3 Color = UnClampedPow(max(saturate(InLDRColor - SceneShadows) * SceneInverseHighLights.rgb, SmallPowConst), SceneMidTones.rgb);
+	
+	half3 ScaledLuminance = dot(Color.rgb, SceneScaledLuminanceWeights.rgb);
+
+
+    half3 MaterialResult = GammaOverlayColor.rgb + Color * SceneDesaturation + ScaledLuminance;
+
+	// Gamma correction (note that for some reason HLSL generates better code when we add a color to the
+    // MaterialResult, so I changed the code so that we add GammaOverlayColor / GammaColorScale to the
+    // MaterialResult as opposed to adding GammaOverlayColor to the LinearColor.
+
+	half3 LinearColor = MaterialResult.rgb * GammaColorScale.rgb;
+
+	return LinearColor;
+}
+
+//  @param InLDRColor in gamma space
+half3 ColorLookupTable(sampler2D LUT, half3 InLDRColor)
+{
+	// saturate() is required if input is not in 0..1 range
+	InLDRColor = saturate(InLDRColor);
+
+	// requires a volume texture 16x16x16 unwrapped in a 2d texture 256x16
+	// can be optimized by using a volume texture
+	float2 Offset = float2(0.5f / 256.0f, 0.5f / 16.0f);
+	float Scale = 15.0f / 16.0f; 
+
+	// Also consider blur value in the blur buffer written by translucency
+	float IntB = floor(InLDRColor.b * 14.9999f) / 16.0f;
+	float FracB = (InLDRColor.b - IntB) * 16.0f;
+
+	float U = IntB + InLDRColor.r * Scale / 16.0f;
+	float V = InLDRColor.g * Scale;
+
+	half3 RG0 = tex2D(LUT, Offset + float2(U             , V)).rgb;
+	half3 RG1 = tex2D(LUT, Offset + float2(U + 1.0f / 16.0f, V)).rgb;
+
+	half3 ret = lerp(RG0, RG1, FracB);
+
+#if SM4_PROFILE
+	ret.rgb = ret.bgr; 
+#endif
+
+	return ret;
+}

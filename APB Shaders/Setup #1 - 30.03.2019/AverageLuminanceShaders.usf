@@ -1,0 +1,127 @@
+/***************************************************************************************/
+/*! \file AverageLuminanceShaders.usf
+*
+* \brief Various pixel shaders for calculating the average luminance of the scene.
+*
+* \b NOW_OWNER: SJT    7/9/2008 <BR>
+*
+* (c) 2008 Realtime Worlds Ltd.
+****************************************************************************************/
+
+#include "Common.usf"
+
+// Shaders that don't care about NUM_SAMPLES still need it defined to something.
+#ifndef NUM_SAMPLES
+#define NUM_SAMPLES 1
+#endif
+
+sampler2D SourceTexture;
+
+// The per-color weighting to be used for luminance calculations in RGB order.
+static const half3 LuminanceVector = float3(0.3, 0.59, 0.11);
+
+//---------------------------------------------------------------------------------------
+//! Helper function for the inital pass.
+//---------------------------------------------------------------------------------------
+half CalcLogLum(float2 UV)
+{
+	half4 Sample = tex2D(SourceTexture, UV);
+	half Luminance = dot(Sample, LuminanceVector);
+
+	// HACK: Clamp to [0,10] to avoid crazy VFX from making the whole world dark. 10 is arbitrary.
+	Luminance = min(Luminance, 10.0f);
+
+	return log(Luminance + 0.0001f);
+}
+
+//---------------------------------------------------------------------------------------
+//! Pixel shader for the initial pass which samples the downsampled-scene, calculates
+//! its log-luminance and averages of a 3x3 kernel.
+//---------------------------------------------------------------------------------------
+void InitialPass(float4 InOffsetUVs[(NUM_SAMPLES + 1) / 2] : TEXCOORD0,
+				 out float4 OutColor : COLOR0)
+{
+	int SampleIndex;
+	half LogLumSum = 0.0f;
+
+	UNROLL
+	for(SampleIndex = 0;SampleIndex < NUM_SAMPLES - 1;SampleIndex += 2)
+	{
+		LogLumSum += CalcLogLum(InOffsetUVs[SampleIndex / 2].xy);
+		LogLumSum += CalcLogLum(InOffsetUVs[SampleIndex / 2].wz);
+	}
+	if(SampleIndex < NUM_SAMPLES)
+	{
+		LogLumSum += CalcLogLum(InOffsetUVs[SampleIndex / 2].xy);
+	}
+	
+	OutColor = LogLumSum / NUM_SAMPLES;
+}
+
+//---------------------------------------------------------------------------------------
+//! Pixel shader for the iterative and final passes. Just averages 16 samples. Final
+//! pass additionally exp()s the result.
+//---------------------------------------------------------------------------------------
+void IterativeAndFinalPass(float4 InOffsetUVs[(NUM_SAMPLES + 1) / 2] : TEXCOORD0,
+						   out float4 OutColor : COLOR0)
+{
+	int SampleIndex;
+	half Sum = 0.0f;
+
+	UNROLL
+	for(SampleIndex = 0;SampleIndex < NUM_SAMPLES - 1;SampleIndex += 2)
+	{
+		Sum += tex2D(SourceTexture, InOffsetUVs[SampleIndex / 2].xy);
+		Sum += tex2D(SourceTexture, InOffsetUVs[SampleIndex / 2].wz);
+	}
+	if(SampleIndex < NUM_SAMPLES)
+	{
+		Sum += tex2D(SourceTexture, InOffsetUVs[SampleIndex / 2].xy);
+	}
+	
+	float Result = Sum / NUM_SAMPLES;
+
+#if FINAL_PASS
+	Result = exp(Result);
+#endif
+
+	OutColor = Result;
+}
+
+// Adaption calculation parameters.
+sampler2D PreviousAdaption;
+sampler2D SceneLuminance;
+
+float ConvergenceRate;
+float AdaptionCentre;
+float AdaptionSlope;
+
+float MinAdaptationIn;
+float MaxAdaptationIn;
+
+//---------------------------------------------------------------------------------------
+//!	Pixel shader for the adaption calculation step.
+//---------------------------------------------------------------------------------------
+void CalculateAdaption(out float4 OutColour : COLOR0)
+{
+	// Clamp previous adaptation values to valid range to prevent uninitialised data
+	// or bogus parameter values from causing the adaptation loop to get "stuck".
+	half fPreviousAdaption = clamp(tex2D(PreviousAdaption, float2(0.5f, 0.5f)), 0.0f, MAX_SCENE_COLOR);
+	half fSceneLuminance = tex2D(SceneLuminance, float2(0.5f, 0.5f));
+
+	float LogLum = log(fSceneLuminance);
+
+	// Some shortcuts to save typing.
+	float b_a = MaxAdaptationIn - MinAdaptationIn;
+	float a = MinAdaptationIn;
+	float s = AdaptionSlope;
+
+	float LogLumScaled = (LogLum - a) / b_a;
+	float TargetLogLumScaled = smoothstep(0.0f, 1.0f, 2.0f/3.0f * s * LogLumScaled - s/3.0f + 1.0f/2.0f);
+	float TargetLogLum = b_a * TargetLogLumScaled + a;
+
+	half TargetLuminance = exp(TargetLogLum);
+
+	half fNewAdaption = fPreviousAdaption + (TargetLuminance - fPreviousAdaption) * ConvergenceRate;
+	OutColour = fNewAdaption;
+}
