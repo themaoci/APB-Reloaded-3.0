@@ -77,6 +77,7 @@ float3 ApplyDOFAndBloom(half4 FocusedSceneColorAndDepth, float2 UV)
 		float4 rawColor = tex2D(BlurredImage,UV);
 		float3 filteredColor = MAX_SCENE_COLOR * rawColor.rgb * 0.5f;//rawColor.rgb;// for testing setted to 1.0f // tex2D(BlurredImage, UV);
 		float3 BloomResult = 1-(saturate(1-(filteredColor.rgb))*saturate(1-lerp(FocusedSceneColorAndDepth.rgb, 0, saturate(rawColor.a))));
+		//float3 BloomResult = 1-(saturate(1-(filteredColor.rgb*BloomAlpha))*saturate(1-lerp(sceneColor.rgb, 0, BloomAlpha*saturate(rawColor.a*4))));
 	#else
 		half FocusedWeight = saturate(1 - CalcUnfocusedPercent(FocusedSceneColorAndDepth.a));
 		//Scale color back up as it was compressed to the [0-1] range to fit in the fixed point filter buffer
