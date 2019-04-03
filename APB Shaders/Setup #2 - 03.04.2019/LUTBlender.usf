@@ -1,0 +1,77 @@
+/*=============================================================================
+	LUTBlender.usf: Filter pixel shader source.
+	Copyright 1998-2010 Epic Games, Inc. All Rights Reserved.
+=============================================================================*/
+
+#include "Common.usf"
+#include "PostProcessCommon.usf"
+
+void MainVS(
+	float2 InPosition		: POSITION,
+	float2 InUV				: TEXCOORD0,
+	out float2 OutUV		: TEXCOORD0,
+	out float4 OutPosition	: POSITION
+	)
+{
+	OutPosition = float4( InPosition, 0, 1 );
+    OutUV = InUV;
+}
+
+// ---------------------------------------------------
+
+// Texture0 is the neutral one and is computed in the shader
+sampler2D Texture1, Texture2, Texture3, Texture4;
+// 0 is for neutral, 1 for Texture1, 2 for ...
+float Weights[5];
+
+// todo: Weight[0] should be used for neutral, Texture* name should start with 1, color correction should apply on top of that
+void MainPS(float2 InUV : TEXCOORD0, out float4 OutColor : COLOR0)
+{
+	float4 Neutral;
+	{
+		float2 UV = InUV;
+
+		UV -= float2(0.5f / 256.0f, 0.5f / 16.0f);
+
+		float Scale = 16.0f / 15.0f;
+
+		float3 RGB;
+		
+		RGB.r = frac(UV.x * 16.0f);
+		RGB.b = UV.x - RGB.r / 16.0f;
+		RGB.g = UV.y;
+
+		Neutral = float4(RGB * Scale, 0);
+
+#if SM4_PROFILE
+	Neutral.rgb = Neutral.bgr;
+#endif
+	}
+
+    OutColor = Weights[0] * Neutral;
+
+	// BLENDCOUNT is the number of LUT that are blended together including the neutral one
+
+#if BLENDCOUNT >= 2
+	OutColor += Weights[1] * tex2D(Texture1, InUV);
+#endif
+
+#if BLENDCOUNT >= 3
+	OutColor += Weights[2] * tex2D(Texture2, InUV);
+#endif
+
+#if BLENDCOUNT >= 4
+	OutColor += Weights[3] * tex2D(Texture3, InUV);
+#endif
+
+#if BLENDCOUNT >= 5
+	OutColor += Weights[4] * tex2D(Texture4, InUV);
+#endif
+
+	// apply math color correction on top ot texture based solution
+	// (faster than doing it in the full screen pass)
+	OutColor.rgb = ColorCorrection(OutColor.rgb);
+}
+
+
+

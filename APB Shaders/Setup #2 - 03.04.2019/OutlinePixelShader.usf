@@ -1,0 +1,462 @@
+/***************************************************************************************/
+/*! \file OutlinePixelShader.usf
+* 
+* Outline, VR-style
+* 
+****************************************************************************************/
+
+#include "_Settings.usf"
+
+#define OUTLINE_ENABLE_HITBOXFINDER 0
+#define OUTLINE_HITBOXFINDER_TOLERANCE 0.5
+#define OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN 0.05
+#define OUTLINE_ENABLE_GLOBAL_OUTLINE 1		//only used when HITBOXFINDER is enabled
+#define OUTLINE_ENABLE_HITBOXRANGE 1		//only used when HITBOXFINDER is enabled
+#define OUTLINE_RANGEFINDER_CAMERA_OFFSET 3.0
+#define OUTLINE_RANGEFINDER_SCALE_X 1.0
+#define OUTLINE_RANGEFINDER_SCALE_Y 1.0
+// OUTLINE_COLOR_B is the highlight color
+#define OUTLINE_EDGE_COLOR_HIGHLIGHT float3( 0.0, 1.0, 1.0 )
+#define OUTLINE_OUTSIDE_COLOR_HIGHLIGHT float3( 0.0, 1.0, 1.0 )
+#define OUTLINE_INSIDE_COLOR_HIGHLIGHT float3( 0.0, 1.0, 1.0 )
+
+// Rangefinder settings
+#define OUTLINE_RANGEFINDER_CAMERA_OFFSET 3.0		// Zoomed all the way out, the player is roughly 3 meters from the camera. All the way in is roughly 1 meter. Marksman mode will modify the zoom, play with this value a bit.
+#define OUTLINE_RANGEFINDER_FADEIN_ENABLE 0.0
+#define OUTLINE_RANGEFINDER_FADEIN_START 0.0
+#define OUTLINE_RANGEFINDER_FADEIN_END 15.0
+#define OUTLINE_RANGEFINDER_IDEAL 10.0
+#define OUTLINE_RANGEFINDER_MAX 20.0
+#define OUTLINE_RANGEFINDER_TOOFAR 30.0
+#define OUTLINE_RANGEFINDER_FADEOUT_ENABLE 1.0
+#define OUTLINE_RANGEFINDER_FADEOUT_START 25.0
+#define OUTLINE_RANGEFINDER_FADEOUT_END 35.0
+// Colors - only the alpha value from the Ideal color will be used. TODO: lerp the alpha values?
+#define OUTLINE_RANGEFINDER_IDEAL_COLOR float4( 1.0, 0.0, 0.0, 1.0)
+#define OUTLINE_RANGEFINDER_MAX_COLOR float4( 1.0, 0.0, 0.0, 1.0)
+#define OUTLINE_RANGEFINDER_TOOFAR_COLOR float4( 0.0, 0.0, 0.0, 1.0)
+
+float2 ScreenSize = float2( 1.0 / SCREEN_SIZE_X, 1.0 / SCREEN_SIZE_Y );
+	
+float flDepth  = CalcSceneDepth( SceneUV );
+float flDepthCenter  = CalcSceneDepth( float2( 0.5, 0.5 ));
+float flDepthTop    = CalcSceneDepth( SceneUV + float2(0.0, -ScreenSize.y) );
+float flDepthLeft   = CalcSceneDepth( SceneUV + float2(-ScreenSize.x,  0.0 ) );
+float flDepthRight  = CalcSceneDepth( SceneUV + float2(ScreenSize.x,  0.0 ) );
+float flDepthBottom = CalcSceneDepth( SceneUV + float2(0.0, ScreenSize.y ) );
+flDepthTop /= 100.0;flDepthLeft/= 100.0;flDepthRight /= 100.0;flDepthBottom /= 100.0;
+	
+float4 flDepthTopColor    = CalcSceneColorAndDepth( SceneUV + float2(0.0, -ScreenSize.y) );
+float4 flDepthLeftColor   = CalcSceneColorAndDepth( SceneUV + float2(-ScreenSize.x,  0.0 ) );
+float4 flDepthRightColor  = CalcSceneColorAndDepth( SceneUV + float2(ScreenSize.x,  0.0 ) );
+float4 flDepthBottomColor = CalcSceneColorAndDepth( SceneUV + float2(0.0, ScreenSize.y ) );
+
+flDepth /= 100.0;flDepthCenter /= 100.0;
+
+float flOutlineIsEdgeAA = 0.0;
+
+float DRAW_OUTLINE_RANGE = 0;
+float DRAW_OUTLINE_RANGE_LERP = 1.0;
+
+//OutColor.rgb = lerp(OutColor.rgb,float3(0.0,0.0,0.0),0.99);	
+	
+
+//rangefinder code
+#if OUTLINE_ENABLE_HITBOXFINDER
+	float OUTLINE_ScalingVertConstant = 1.0 / 1080.0;
+	float OUTLINE_ScalingHorizConstant = 1.0 / 1920.0; 
+	float OUTLINE_CENTER_TO_UV_DIFFERENCE = 0;
+	
+	float OUTLINE_DepthScale = flDepthCenter - OUTLINE_RANGEFINDER_CAMERA_OFFSET;
+	float OUTLINE_ScaledVertSize = 0;
+	float OUTLINE_ScaledHorizSize = 0;
+	
+	if (OUTLINE_ENABLE_HITBOXFINDER == 1 && OUTLINE_DepthScale <= 105.0)
+	{
+		OUTLINE_ScaledVertSize = OUTLINE_RANGEFINDER_SCALE_Y * (OUTLINE_ScalingVertConstant * (pow(0.032356623456625676+0.015425420043751505 * pow(OUTLINE_DepthScale,0.5295789277743751505),(-1 / 0.47239331907128335)))) / 2;
+		OUTLINE_ScaledHorizSize = OUTLINE_RANGEFINDER_SCALE_X * (0.464 * OUTLINE_ScalingHorizConstant * (pow(0.032356623456625676+0.015425420043751505 * pow(OUTLINE_DepthScale,0.5295789277743751505),(-1 / 0.47239331907128335)))) / 2;
+	}
+	else
+	{
+		//OUTLINE_ScaledVertSize = OUTLINE_PIXEL_SCAN_LIMIT_Y/200;
+		//OUTLINE_ScaledHorizSize = OUTLINE_PIXEL_SCAN_LIMIT_X/200;
+		OUTLINE_ScaledVertSize = 0.5;
+		OUTLINE_ScaledHorizSize = 0.5;
+	}	
+#endif // OUTLINE_ENABLE_HITBOXFINDER
+	
+	
+	
+	
+// fix holes in the world?	
+if (flDepth > 0 && flDepthTop > 0 && flDepthLeft > 0 && flDepthRight > 0 && flDepthBottom > 0)
+{	
+	
+	// edge of object
+	if(flDepth <= OUTLINE_MAXDISTANCE && (flDepthTop >= OUTLINE_GAP * flDepth + flDepth || flDepthLeft >= OUTLINE_GAP * flDepth + flDepth || flDepthRight >= OUTLINE_GAP * flDepth + flDepth || flDepthBottom >= OUTLINE_GAP * flDepth + flDepth ))
+	{
+		if (OUTLINE_DRAW_EDGE == 1)
+		{
+		//rangefinder limit
+			#if OUTLINE_ENABLE_HITBOXFINDER
+				if ( SceneUV.x > 0.5 - OUTLINE_ScaledHorizSize && SceneUV.x < 0.5 + OUTLINE_ScaledHorizSize && SceneUV.y > 0.5 - OUTLINE_ScaledVertSize && SceneUV.y < 0.5 + OUTLINE_ScaledVertSize)
+				{
+					if (flDepth >= flDepthCenter - OUTLINE_HITBOXFINDER_TOLERANCE && flDepth <= flDepthCenter + OUTLINE_HITBOXFINDER_TOLERANCE) 
+					{
+						#if OUTLINE_ENABLE_HITBOXRANGE
+							DRAW_OUTLINE_RANGE = 1;
+						#else
+							OutColor.rgb = OUTLINE_EDGE_COLOR_HIGHLIGHT;
+						#endif
+						
+					}
+					else
+					{
+						#if OUTLINE_ENABLE_GLOBAL_OUTLINE
+							OutColor.rgb = OUTLINE_EDGE_COLOR;
+						#endif
+					}
+				}
+				else
+				{
+					#if OUTLINE_ENABLE_GLOBAL_OUTLINE
+						OutColor.rgb = OUTLINE_EDGE_COLOR;
+					#endif
+				}
+			#else	
+				OutColor.rgb = OUTLINE_EDGE_COLOR;
+			#endif // OUTLINE_ENABLE_HITBOXFINDER
+		}
+	}
+	else 
+	{
+		// test AA?
+		if(flDepth <= OUTLINE_MAXDISTANCE)
+		{
+			if (OUTLINE_DRAW_EDGE == 1)
+			{
+				#if OUTLINE_ENABLE_ANTIALIASING
+					//rangefinder limit
+					#if OUTLINE_ENABLE_HITBOXFINDER
+						if ( SceneUV.x > 0.5 - OUTLINE_ScaledHorizSize && SceneUV.x < 0.5 + OUTLINE_ScaledHorizSize && SceneUV.y > 0.5 - OUTLINE_ScaledVertSize && SceneUV.y < 0.5 + OUTLINE_ScaledVertSize)
+						{
+							if (flDepth >= flDepthCenter - OUTLINE_HITBOXFINDER_TOLERANCE && flDepth <= flDepthCenter + OUTLINE_HITBOXFINDER_TOLERANCE) 
+							{
+								#if OUTLINE_ENABLE_HITBOXRANGE
+									DRAW_OUTLINE_RANGE = 1;
+									DRAW_OUTLINE_RANGE_LERP = ((max(max(flDepthTop, flDepthLeft),max(flDepthRight, flDepthBottom)) - flDepth ) / flDepth ) / ( OUTLINE_GAP );
+								#else
+
+									OutColor.rgb = lerp(OutColor.rgb, OUTLINE_EDGE_COLOR_HIGHLIGHT, ((max(max(flDepthTop, flDepthLeft),max(flDepthRight, flDepthBottom)) - flDepth ) / flDepth ) / ( OUTLINE_GAP ) );
+									//OutColor.rgb = OUTLINE_EDGE_COLOR_HIGHLIGHT;
+								#endif
+							}
+							else
+							{
+								#if OUTLINE_ENABLE_GLOBAL_OUTLINE
+									if(flDepth <= OUTLINE_MAXDISTANCE && (flDepthTop >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthLeft >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthRight >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthBottom >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth ))
+									{
+										OutColor.rgb = lerp(OutColor.rgb, OUTLINE_EDGE_COLOR, ((max(max(flDepthTop, flDepthLeft),max(flDepthRight, flDepthBottom)) - flDepth ) / flDepth ) / ( OUTLINE_GAP ) );
+									}
+								#endif
+							}
+						}
+						else
+						{
+							#if OUTLINE_ENABLE_GLOBAL_OUTLINE
+								if(flDepth <= OUTLINE_MAXDISTANCE && (flDepthTop >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthLeft >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthRight >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthBottom >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth ))
+								{
+									OutColor.rgb = lerp(OutColor.rgb, OUTLINE_EDGE_COLOR, ((max(max(flDepthTop, flDepthLeft),max(flDepthRight, flDepthBottom)) - flDepth ) / flDepth ) / ( OUTLINE_GAP ) );
+								}
+							#endif
+						}
+					#else
+						if(flDepth <= OUTLINE_MAXDISTANCE && (flDepthTop >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthLeft >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthRight >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthBottom >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth ))
+						{
+							OutColor.rgb = lerp(OutColor.rgb, OUTLINE_EDGE_COLOR, ((max(max(flDepthTop, flDepthLeft),max(flDepthRight, flDepthBottom)) - flDepth ) / flDepth ) / ( OUTLINE_GAP ) );
+						}
+					#endif // OUTLINE_ENABLE_HITBOXFINDER
+				#endif
+			}
+			else
+			{
+				if(flDepth <= OUTLINE_MAXDISTANCE && (flDepthTop >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthLeft >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthRight >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthBottom >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth ))
+				{
+					flOutlineIsEdgeAA = 1.0;
+				}
+			}
+		
+			//OutColor.rgb = lerp(OutColor.rgb, OUTLINE_EDGE_COLOR, ((max(max(flDepthTop, flDepthLeft),max(flDepthRight, flDepthBottom)) - flDepth ) / flDepth ) / OUTLINE_GAP);
+		}	
+		
+		// 1px outside object
+		if(OUTLINE_DRAW_OUTSIDE == 1)
+		{
+			float flOutlineDrawEdge = 0.0;
+		
+			if(flDepth - flDepthTop >= OUTLINE_GAP * flDepthTop && flDepthTop <= OUTLINE_MAXDISTANCE)
+			{
+				flOutlineDrawEdge = 1.0;
+				#if OUTLINE_ENABLE_HITBOXFINDER
+					#if !OUTLINE_ENABLE_GLOBAL_OUTLINE
+						flOutlineDrawEdge = 0.0;
+					#endif
+					if ( SceneUV.x > 0.5 - OUTLINE_ScaledHorizSize && SceneUV.x < 0.5 + OUTLINE_ScaledHorizSize && SceneUV.y > 0.5 - OUTLINE_ScaledVertSize && SceneUV.y < 0.5 + OUTLINE_ScaledVertSize)
+					{
+						if (flDepthTop >= flDepthCenter - OUTLINE_HITBOXFINDER_TOLERANCE && flDepthTop <= flDepthCenter + OUTLINE_HITBOXFINDER_TOLERANCE) 
+						{
+							// TODO: fix AA, for now disable it and just draw the outline.
+							#if OUTLINE_ENABLE_DYNAMIC_THICKNESS
+								OutColor.rgb = lerp(OutColor.rgb, OUTLINE_OUTSIDE_COLOR_HIGHLIGHT, saturate((flDepth - flDepthTop) / OUTLINE_DYNAMIC_THICKNESS_SCALE));
+								//OutColor.rgb = OUTLINE_OUTSIDE_COLOR_HIGHLIGHT;
+							#else
+								OutColor.rgb = OUTLINE_OUTSIDE_COLOR_HIGHLIGHT;
+							#endif // OUTLINE_ENABLE_DYNAMIC_THICKNESS
+						
+						flOutlineDrawEdge = 0.0;
+						}
+					}
+				#endif // OUTLINE_ENABLE_HITBOXFINDER
+			}
+			if(flDepth - flDepthLeft >= OUTLINE_GAP * flDepthLeft && flDepthLeft <= OUTLINE_MAXDISTANCE)
+			{
+				flOutlineDrawEdge = 1.0;
+				#if OUTLINE_ENABLE_HITBOXFINDER
+					#if !OUTLINE_ENABLE_GLOBAL_OUTLINE
+						flOutlineDrawEdge = 0.0;
+					#endif
+					if ( SceneUV.x > 0.5 - OUTLINE_ScaledHorizSize && SceneUV.x < 0.5 + OUTLINE_ScaledHorizSize && SceneUV.y > 0.5 - OUTLINE_ScaledVertSize && SceneUV.y < 0.5 + OUTLINE_ScaledVertSize)
+					{
+						if (flDepthLeft >= flDepthCenter - OUTLINE_HITBOXFINDER_TOLERANCE && flDepthLeft <= flDepthCenter + OUTLINE_HITBOXFINDER_TOLERANCE) 
+							{
+							// TODO: fix AA, for now disable it and just draw the outline.
+							#if OUTLINE_ENABLE_DYNAMIC_THICKNESS
+								OutColor.rgb = lerp(OutColor.rgb, OUTLINE_OUTSIDE_COLOR_HIGHLIGHT, saturate((flDepth - flDepthLeft) / OUTLINE_DYNAMIC_THICKNESS_SCALE));
+								//OutColor.rgb = OUTLINE_OUTSIDE_COLOR_HIGHLIGHT;
+							#else
+								OutColor.rgb = OUTLINE_OUTSIDE_COLOR_HIGHLIGHT;
+							#endif // OUTLINE_ENABLE_DYNAMIC_THICKNESS
+							
+							flOutlineDrawEdge = 0.0;
+						}
+					}
+				#endif // OUTLINE_ENABLE_HITBOXFINDER
+			}
+			if(flDepth - flDepthRight >= OUTLINE_GAP * flDepthRight && flDepthRight <= OUTLINE_MAXDISTANCE)
+			{
+				flOutlineDrawEdge = 1.0;
+				#if OUTLINE_ENABLE_HITBOXFINDER
+					#if !OUTLINE_ENABLE_GLOBAL_OUTLINE
+						flOutlineDrawEdge = 0.0;
+					#endif
+					if ( SceneUV.x > 0.5 - OUTLINE_ScaledHorizSize && SceneUV.x < 0.5 + OUTLINE_ScaledHorizSize && SceneUV.y > 0.5 - OUTLINE_ScaledVertSize && SceneUV.y < 0.5 + OUTLINE_ScaledVertSize)
+					{
+						if (flDepthRight >= flDepthCenter - OUTLINE_HITBOXFINDER_TOLERANCE && flDepthRight <= flDepthCenter + OUTLINE_HITBOXFINDER_TOLERANCE) 
+						{
+							// TODO: fix AA, for now disable it and just draw the outline.
+							#if OUTLINE_ENABLE_DYNAMIC_THICKNESS
+								OutColor.rgb = lerp(OutColor.rgb, OUTLINE_OUTSIDE_COLOR_HIGHLIGHT, saturate((flDepth - flDepthRight) / OUTLINE_DYNAMIC_THICKNESS_SCALE));
+								//OutColor.rgb = OUTLINE_OUTSIDE_COLOR_HIGHLIGHT;
+							#else
+								OutColor.rgb = OUTLINE_OUTSIDE_COLOR_HIGHLIGHT;
+							#endif // OUTLINE_ENABLE_DYNAMIC_THICKNESS
+							
+							flOutlineDrawEdge = 0.0;
+						}
+					}
+				#endif // OUTLINE_ENABLE_HITBOXFINDER
+			}
+			if(flDepth - flDepthBottom >= OUTLINE_GAP * flDepthBottom && flDepthBottom <= OUTLINE_MAXDISTANCE)
+			{
+				flOutlineDrawEdge = 1.0;
+				#if OUTLINE_ENABLE_HITBOXFINDER
+					#if !OUTLINE_ENABLE_GLOBAL_OUTLINE
+						flOutlineDrawEdge = 0.0;
+					#endif
+					if ( SceneUV.x > 0.5 - OUTLINE_ScaledHorizSize && SceneUV.x < 0.5 + OUTLINE_ScaledHorizSize && SceneUV.y > 0.5 - OUTLINE_ScaledVertSize && SceneUV.y < 0.5 + OUTLINE_ScaledVertSize)
+					{
+						if (flDepthBottom >= flDepthCenter - OUTLINE_HITBOXFINDER_TOLERANCE && flDepthBottom <= flDepthCenter + OUTLINE_HITBOXFINDER_TOLERANCE) 
+						{
+							// TODO: fix AA, for now disable it and just draw the outline.
+							#if OUTLINE_ENABLE_DYNAMIC_THICKNESS
+								OutColor.rgb = lerp(OutColor.rgb, OUTLINE_OUTSIDE_COLOR_HIGHLIGHT, saturate((flDepth - flDepthBottom) / OUTLINE_DYNAMIC_THICKNESS_SCALE));
+								//OutColor.rgb = OUTLINE_OUTSIDE_COLOR_HIGHLIGHT;
+							#else
+								OutColor.rgb = OUTLINE_OUTSIDE_COLOR_HIGHLIGHT;
+							#endif // OUTLINE_ENABLE_DYNAMIC_THICKNESS
+							
+							flOutlineDrawEdge = 0.0;
+						}
+					}
+				#endif // OUTLINE_ENABLE_HITBOXFINDER
+			}
+			
+			if (flOutlineDrawEdge == 1.0)
+			{
+				#if OUTLINE_ENABLE_DYNAMIC_THICKNESS
+					OutColor.rgb = lerp(OutColor.rgb, OUTLINE_OUTSIDE_COLOR, saturate(max(max(flDepth - flDepthTop, flDepth - flDepthLeft),max(flDepth - flDepthRight, flDepth - flDepthBottom)) / OUTLINE_DYNAMIC_THICKNESS_SCALE));
+					//OutColor.rgb = OUTLINE_OUTSIDE_COLOR;
+				#else
+					OutColor.rgb = OUTLINE_OUTSIDE_COLOR;
+				#endif // OUTLINE_ENABLE_DYNAMIC_THICKNESS
+			}
+		}
+
+		if(OUTLINE_DRAW_INSIDE == 1 && flDepth <= OUTLINE_MAXDISTANCE)
+		{
+			flDepthTop    = CalcSceneDepth( SceneUV + float2(0.0, 2 * -ScreenSize.y) );
+			flDepthLeft   = CalcSceneDepth( SceneUV + float2(2 * -ScreenSize.x,  0.0 ) );
+			flDepthRight  = CalcSceneDepth( SceneUV + float2(2 * ScreenSize.x,  0.0 ) );
+			flDepthBottom = CalcSceneDepth( SceneUV + float2(0.0, 2 * ScreenSize.y ) );
+			flDepthTop /= 100.0;flDepthLeft/= 100.0;flDepthRight /= 100.0;flDepthBottom /= 100.0;
+				
+			//omg rangefinder
+			float flOutlineDrawEdge = 0.0;
+				
+			// 1px inside object
+			if(flDepthTop >= OUTLINE_GAP * flDepth + flDepth || flDepthLeft >= OUTLINE_GAP * flDepth + flDepth || flDepthRight >= OUTLINE_GAP * flDepth + flDepth || flDepthBottom >= OUTLINE_GAP * flDepth + flDepth )
+			{
+				flOutlineDrawEdge = 1.0;
+				#if OUTLINE_ENABLE_HITBOXFINDER
+					#if !OUTLINE_ENABLE_GLOBAL_OUTLINE
+						flOutlineDrawEdge = 0.0;
+					#endif
+					if ( SceneUV.x > 0.5 - OUTLINE_ScaledHorizSize && SceneUV.x < 0.5 + OUTLINE_ScaledHorizSize && SceneUV.y > 0.5 - OUTLINE_ScaledVertSize && SceneUV.y < 0.5 + OUTLINE_ScaledVertSize)
+					{
+						if (flDepth >= flDepthCenter - OUTLINE_HITBOXFINDER_TOLERANCE && flDepth <= flDepthCenter + OUTLINE_HITBOXFINDER_TOLERANCE) 
+						{
+							// TODO: fix AA, for now disable it and just draw the outline.
+							#if OUTLINE_ENABLE_DYNAMIC_THICKNESS
+								OutColor.rgb = lerp(OutColor.rgb, OUTLINE_INSIDE_COLOR_HIGHLIGHT, saturate(flDepth / OUTLINE_DYNAMIC_THICKNESS_SCALE));
+								//OutColor.rgb = OUTLINE_INSIDE_COLOR_HIGHLIGHT;
+							#else
+								OutColor.rgb = OUTLINE_INSIDE_COLOR_HIGHLIGHT;
+							#endif // OUTLINE_ENABLE_DYNAMIC_THICKNESS
+						
+						flOutlineDrawEdge = 0.0;
+						}
+					}
+				#endif // OUTLINE_ENABLE_HITBOXFINDER
+			}
+			
+			// test AA?
+			else
+			{
+				#if OUTLINE_ENABLE_ANTIALIASING
+					#if !OUTLINE_ENABLE_DYNAMIC_THICKNESS
+						if (flOutlineIsEdgeAA = 0.0)
+						{
+							//rangefinder limit
+							#if OUTLINE_ENABLE_HITBOXFINDER
+								if ( SceneUV.x > 0.5 - OUTLINE_ScaledHorizSize && SceneUV.x < 0.5 + OUTLINE_ScaledHorizSize && SceneUV.y > 0.5 - OUTLINE_ScaledVertSize && SceneUV.y < 0.5 + OUTLINE_ScaledVertSize)
+								{
+									if (flDepth >= flDepthCenter - OUTLINE_HITBOXFINDER_TOLERANCE && flDepth <= flDepthCenter + OUTLINE_HITBOXFINDER_TOLERANCE) 
+									{
+										OutColor.rgb = lerp(OutColor.rgb, OUTLINE_INSIDE_COLOR_HIGHLIGHT, ((max(max(flDepthTop, flDepthLeft),max(flDepthRight, flDepthBottom)) - flDepth ) / flDepth ) / ( OUTLINE_GAP ) );
+										//OutColor.rgb = OUTLINE_EDGE_COLOR_HIGHLIGHT;
+									}
+									else
+									{
+										#if OUTLINE_ENABLE_GLOBAL_OUTLINE
+											if(flDepth <= OUTLINE_MAXDISTANCE && (flDepthTop >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthLeft >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthRight >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthBottom >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth ))
+											{
+												OutColor.rgb = lerp(OutColor.rgb, OUTLINE_INSIDE_COLOR, ((max(max(flDepthTop, flDepthLeft),max(flDepthRight, flDepthBottom)) - flDepth ) / flDepth ) / ( OUTLINE_GAP ) );
+											}
+										#endif
+									}
+								}
+								else
+								{
+									#if OUTLINE_ENABLE_GLOBAL_OUTLINE
+										if(flDepth <= OUTLINE_MAXDISTANCE && (flDepthTop >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthLeft >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthRight >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthBottom >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth ))
+										{
+											OutColor.rgb = lerp(OutColor.rgb, OUTLINE_INSIDE_COLOR, ((max(max(flDepthTop, flDepthLeft),max(flDepthRight, flDepthBottom)) - flDepth ) / flDepth ) / ( OUTLINE_GAP ) );
+										}
+									#endif
+								}
+							#else
+								if(flDepth <= OUTLINE_MAXDISTANCE && (flDepthTop >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthLeft >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthRight >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth || flDepthBottom >= OUTLINE_OUTSIDE_RANGEFINDER_ALPHA_MIN * flDepth + flDepth ))
+								{
+									OutColor.rgb = lerp(OutColor.rgb, OUTLINE_INSIDE_COLOR, ((max(max(flDepthTop, flDepthLeft),max(flDepthRight, flDepthBottom)) - flDepth ) / flDepth ) / ( OUTLINE_GAP ) );
+								}
+							#endif // OUTLINE_ENABLE_HITBOXFINDER
+						}
+					#endif // !OUTLINE_ENABLE_DYNAMIC_THICKNESS
+				#endif // OUTLINE_ENABLE_ANTIALIASING
+			}
+		
+			if (flOutlineDrawEdge == 1.0)
+			{
+				// TODO: fix AA, for now disable it and just draw the outline.
+				#if OUTLINE_ENABLE_DYNAMIC_THICKNESS
+					OutColor.rgb = lerp(OutColor.rgb, OUTLINE_INSIDE_COLOR, saturate(flDepth / OUTLINE_DYNAMIC_THICKNESS_SCALE));
+					//OutColor.rgb = OUTLINE_INSIDE_COLOR;
+				#else
+					OutColor.rgb = OUTLINE_INSIDE_COLOR;
+				#endif // OUTLINE_ENABLE_DYNAMIC_THICKNESS
+			}
+			
+		}
+	
+	}
+
+}
+if (DRAW_OUTLINE_RANGE == 1)
+{
+	float rf_FadeIn_Enable = OUTLINE_RANGEFINDER_FADEIN_ENABLE;
+	float rf_FadeOut_Enable = OUTLINE_RANGEFINDER_FADEOUT_ENABLE;
+	float rf_Camera_Offset = OUTLINE_RANGEFINDER_CAMERA_OFFSET * 100.0;
+	float rf_FadeIn_Start = OUTLINE_RANGEFINDER_FADEIN_START * 100.0 + rf_Camera_Offset;
+	float rf_FadeIn_End =  OUTLINE_RANGEFINDER_FADEIN_END * 100.0 + rf_Camera_Offset;
+	float rf_Ideal = OUTLINE_RANGEFINDER_IDEAL * 100.0 + rf_Camera_Offset;
+	float rf_Max = OUTLINE_RANGEFINDER_MAX * 100.0 + rf_Camera_Offset;
+	float rf_TooFar = OUTLINE_RANGEFINDER_TOOFAR * 100.0 + rf_Camera_Offset;
+	float rf_FadeOut_Start = OUTLINE_RANGEFINDER_FADEOUT_START * 100.0 + rf_Camera_Offset;
+	float rf_FadeOut_End = OUTLINE_RANGEFINDER_FADEOUT_END * 100.0 + rf_Camera_Offset;
+	float4 rf_Ideal_Color = OUTLINE_RANGEFINDER_IDEAL_COLOR;
+	float4 rf_Max_Color = OUTLINE_RANGEFINDER_MAX_COLOR;
+	float4 rf_TooFar_Color = OUTLINE_RANGEFINDER_TOOFAR_COLOR;
+	float4 rf_CenterDepth = CalcSceneColorAndDepth( float2( 0.5, 0.5 ) );
+	
+	float4 rf_Temporary_Color;
+	rf_Temporary_Color.rgb = rf_Ideal_Color.rgb;
+	rf_Temporary_Color.a = rf_Ideal_Color.a;
+
+	if ( rf_CenterDepth.a < rf_FadeIn_Start && rf_FadeIn_Enable == 1.0 )
+	{
+		rf_Temporary_Color.a = 0.0;
+	}
+	else if ( rf_CenterDepth.a > rf_FadeOut_End && rf_FadeOut_Enable == 1.0 )
+	{
+		rf_Temporary_Color.a = 0.0;
+	}
+	else if ( rf_CenterDepth.a >= rf_FadeIn_Start &&  rf_CenterDepth.a <= rf_FadeIn_End  && rf_FadeIn_End > 0.0 && rf_FadeIn_Enable == 1.0  )
+	{
+    	rf_Temporary_Color.a = ((rf_CenterDepth.a - rf_FadeIn_Start) / (rf_FadeIn_End - rf_FadeIn_Start)) * rf_Ideal_Color.a;
+	}
+	else if ( rf_CenterDepth.a >= rf_FadeOut_Start &&  rf_CenterDepth.a <= rf_FadeOut_End && rf_FadeOut_Enable == 1.0 )
+	{
+    	rf_Temporary_Color.a = (1.0 - ((rf_CenterDepth.a - rf_FadeOut_Start) / (rf_FadeOut_End - rf_FadeOut_Start))) * rf_Ideal_Color.a;
+	}
+	
+	
+	if ( rf_CenterDepth.a  <= rf_Ideal )
+	{
+    	rf_Temporary_Color.rgb = rf_Ideal_Color.rgb;
+	}
+	else if ( rf_CenterDepth.a  <= rf_Max )
+	{
+    	rf_Temporary_Color.rgb = lerp( rf_Ideal_Color.rgb, rf_Max_Color.rgb, (rf_CenterDepth.a - rf_Ideal) / (rf_Max - rf_Ideal) );
+	}
+	else if ( rf_CenterDepth.a  <= rf_TooFar )
+	{
+    	rf_Temporary_Color.rgb = lerp( rf_Max_Color.rgb, rf_TooFar_Color.rgb, (rf_CenterDepth.a - rf_Max) / (rf_TooFar - rf_Max) );
+	}
+	else if ( rf_CenterDepth.a  > rf_TooFar )
+	{
+    	rf_Temporary_Color.rgb = rf_TooFar_Color.rgb;
+	}
+	
+	OutColor.rgb = lerp(OutColor.rgb, rf_Temporary_Color.rgb, (rf_Temporary_Color.a * DRAW_OUTLINE_RANGE_LERP));
+
+}

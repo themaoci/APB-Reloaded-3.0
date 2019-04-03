@@ -1,0 +1,32 @@
+/***************************************************************************************/
+/*! \file BlobShadowVertexShader.usf
+*
+* \brief Vertex shader for the blob pass.
+*
+* \b NOW_OWNER: SJT    20/11/2007 <BR>
+*
+* (c) 2007 Real Time Worlds Ltd.
+****************************************************************************************/
+
+#include "Common.usf"
+
+// Model space -> world space matrix.
+float4x4 LocalToWorld;
+
+// Entry point.
+void Main(
+	in float4 InPosition : POSITION,
+	out float4 OutScreenVector : TEXCOORD0,
+	out float4 OutScreenPosition : TEXCOORD1,
+	out float4 OutPosition : POSITION
+	)
+{
+	// Move model-space position from vb to world-space
+	float4 WorldPosition = MulMatrix(LocalToWorld, InPosition);
+
+	// compute screenspace position
+	OutScreenPosition = OutPosition = MulMatrix(ViewProjectionMatrix, WorldPosition);
+
+	// World-space camera vector for computing world position in the pixel shader.
+	OutScreenVector = WorldPosition - CameraPosition;
+}

@@ -1,0 +1,77 @@
+/***************************************************************************************
+ * TESDilateTextureShader.usf
+ * --------------------------
+ *
+ * Dilation filter shaders
+ *
+ * OWNER: Maurizio Sciglio 17/07/2009
+ *
+ * ---Amendments-----
+ *
+ * (c) 2009 Real Time Worlds, Ltd.
+ ****************************************************************************************/
+
+sampler2D	SourceTexture;
+sampler2D	MaskTexture;
+float		fTexelSize;
+
+void vertexShader(
+	in float4 InPosition : POSITION,
+	in float2 InTexCoord : TEXCOORD0,
+	out float2 OutTexCoord : TEXCOORD0,
+	out float4 OutPosition : POSITION
+	)
+{
+	OutPosition = InPosition;
+	OutTexCoord = InTexCoord;
+}
+
+void pixelShader(
+	in float2 UV : TEXCOORD0,
+	out float4 OutColor : COLOR0
+	)
+{
+	float2 texCoords[9] =
+	{
+		UV + float2(-fTexelSize, -fTexelSize),	// Top left
+		UV + float2(0, -fTexelSize), 			// Top
+		UV + float2(fTexelSize, -fTexelSize), 	// Top right
+		UV + float2(-fTexelSize, 0), 			// Left
+		UV , 									// Centre
+		UV + float2(fTexelSize, 0), 			// Right
+		UV + float2(-fTexelSize, fTexelSize), 	// Bottom left
+		UV + float2(0, fTexelSize), 			// Bottom
+		UV + float2(fTexelSize, fTexelSize), 	// Bottom right		
+	};
+	
+	float filterWeights[9] =
+	{
+		0,	1,	0,
+		1,	0,	1,
+		0,	1,	0
+	};
+
+	float4 accumulatedCol = float4(0,0,0,0);
+	float coverage = 0;
+	
+	for (int i=0; i<9; i++)
+	{
+		float4 sourceCol = tex2D(SourceTexture, texCoords[i]);
+		float maskValue = tex2D(MaskTexture, texCoords[i]).x;
+		
+		accumulatedCol += sourceCol * maskValue * filterWeights[i];
+		coverage += maskValue * filterWeights[i];
+	}
+		
+	float maskValue = tex2D(MaskTexture, UV).x;
+	float4 sourceCol = tex2D(SourceTexture, UV);
+	
+	if ( (maskValue<0.01f) && (coverage > 0) )
+	{
+		OutColor = accumulatedCol / coverage;
+	}
+	else
+	{
+		OutColor = sourceCol;
+	}	
+}

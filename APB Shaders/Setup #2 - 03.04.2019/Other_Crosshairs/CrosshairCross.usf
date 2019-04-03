@@ -1,0 +1,29 @@
+/***************************************************************************************/
+/*! \file CrosshairCross.usf
+* 
+* Modular crosshair shape - Cross by Blizzie
+* Requires Crosshair.usf, CrosshairSettings.usf
+* 
+* Please see the readme or CrosshairSettings.usf for settings to change
+* You don't need to make changes to this file.
+****************************************************************************************/
+{
+	if (SceneUV.x >= 0.5 - CROSSHAIR_CROSS_SIZE && SceneUV.x <= 0.5 + CROSSHAIR_CROSS_SIZE && SceneUV.y >= 0.499 && SceneUV.y <= 0.501)
+    {
+        CROSSHAIR_PIXEL_DRAWN = 1;
+        #if CROSSHAIR_CROSS_DYNAMIC_COLOR
+            OutColor.rgb = lerp(OutColor.rgb, float3(1.0,1.0,1.0) - OutColor.rgb, CROSSHAIR_CROSS_COLOR.a);
+        #else
+            OutColor.rgb = lerp(OutColor.rgb, CROSSHAIR_CROSS_COLOR.rgb, CROSSHAIR_CROSS_COLOR.a);
+        #endif
+    }
+    else if (SceneUV.x >= 0.4995 && SceneUV.x <= 0.5005 && SceneUV.y >= 0.5 - (CROSSHAIR_CROSS_SIZE * aspectRatio) && SceneUV.y <= 0.5 + (CROSSHAIR_CROSS_SIZE * aspectRatio))
+    {
+        CROSSHAIR_PIXEL_DRAWN = 1;
+        #if CROSSHAIR_CROSS_DYNAMIC_COLOR
+            OutColor.rgb = lerp(OutColor.rgb, float3(1.0,1.0,1.0) - OutColor.rgb, CROSSHAIR_CROSS_COLOR.a);
+        #else
+            OutColor.rgb = lerp(OutColor.rgb, CROSSHAIR_CROSS_COLOR.rgb, CROSSHAIR_CROSS_COLOR.a);
+        #endif
+    }
+}

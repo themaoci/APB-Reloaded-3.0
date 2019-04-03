@@ -1,0 +1,29 @@
+/***************************************************************************************/
+/*! \file CrosshairSquare.usf
+* 
+* Modular crosshair shape - Square by Kimiko
+* Requires Crosshair.usf, CrosshairSettings.usf
+* 
+* Please see the readme or CrosshairSettings.usf for settings to change
+* You don't need to make changes to this file.
+****************************************************************************************/
+{
+	if ((SceneUV.y <= 0.5 - (CROSSHAIR_SQUARE_HORIZ_GAP * aspectRatio) || SceneUV.y >= 0.5 + (CROSSHAIR_SQUARE_HORIZ_GAP * aspectRatio)) && (SceneUV.x >= 0.5 - CROSSHAIR_SQUARE_WIDTH - CROSSHAIR_SQUARE_THICKNESS && SceneUV.x <= 0.5 - CROSSHAIR_SQUARE_WIDTH + CROSSHAIR_SQUARE_THICKNESS || SceneUV.x >= 0.5 + CROSSHAIR_SQUARE_WIDTH - CROSSHAIR_SQUARE_THICKNESS && SceneUV.x <= 0.5 + CROSSHAIR_SQUARE_WIDTH + CROSSHAIR_SQUARE_THICKNESS) && SceneUV.y >= 0.5 - (CROSSHAIR_SQUARE_HEIGHT * aspectRatio) - (CROSSHAIR_SQUARE_THICKNESS * aspectRatio) && SceneUV.y <= 0.5 + (CROSSHAIR_SQUARE_HEIGHT * aspectRatio) + (CROSSHAIR_SQUARE_THICKNESS * aspectRatio))
+    {
+        CROSSHAIR_PIXEL_DRAWN = 1;
+        #if CROSSHAIR_SQUARE_DYNAMIC_COLOR
+            OutColor.rgb = lerp(OutColor.rgb, float3(1.0,1.0,1.0) - OutColor.rgb, CROSSHAIR_SQUARE_COLOR.a);
+        #else
+            OutColor.rgb = lerp(OutColor.rgb, CROSSHAIR_SQUARE_COLOR.rgb, CROSSHAIR_SQUARE_COLOR.a);
+        #endif
+    }
+    else if ((SceneUV.x <= 0.5 - CROSSHAIR_SQUARE_VERT_GAP || SceneUV.x >= 0.5 + CROSSHAIR_SQUARE_VERT_GAP) && (SceneUV.y >= 0.5 - (CROSSHAIR_SQUARE_HEIGHT * aspectRatio) - (CROSSHAIR_SQUARE_THICKNESS * aspectRatio) && SceneUV.y <= 0.5 - (CROSSHAIR_SQUARE_HEIGHT * aspectRatio) + (CROSSHAIR_SQUARE_THICKNESS * aspectRatio) || SceneUV.y >= 0.5 + (CROSSHAIR_SQUARE_HEIGHT * aspectRatio) - (CROSSHAIR_SQUARE_THICKNESS * aspectRatio) && SceneUV.y <= 0.5 + (CROSSHAIR_SQUARE_HEIGHT * aspectRatio) + (CROSSHAIR_SQUARE_THICKNESS * aspectRatio)) && SceneUV.x >= 0.5 - CROSSHAIR_SQUARE_WIDTH - CROSSHAIR_SQUARE_THICKNESS && SceneUV.x <= 0.5 + CROSSHAIR_SQUARE_WIDTH + CROSSHAIR_SQUARE_THICKNESS)
+    {
+        CROSSHAIR_PIXEL_DRAWN = 1;
+        #if CROSSHAIR_SQUARE_DYNAMIC_COLOR
+            OutColor.rgb = lerp(OutColor.rgb, float3(1.0,1.0,1.0) - OutColor.rgb, CROSSHAIR_SQUARE_COLOR.a);
+        #else
+            OutColor.rgb = lerp(OutColor.rgb, CROSSHAIR_SQUARE_COLOR.rgb, CROSSHAIR_SQUARE_COLOR.a);
+        #endif
+    }
+}

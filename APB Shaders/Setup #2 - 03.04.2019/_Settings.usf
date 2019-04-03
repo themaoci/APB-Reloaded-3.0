@@ -1,0 +1,79 @@
+   /*===================================================================/
+  /========= Made by TheMaoci, KyoukiDotExe( ChijiruDotExe ) ==========/
+ /===================== filename: _Settings.usf ======================================*/
+/** INFO **/
+// 1 - ON 
+// 0 - OFF
+/** Working Section **/
+//Version - for crosshair and outline
+#define SCREEN_SIZE_X 1024.0
+#define SCREEN_SIZE_Y 768.0
+
+#define RTW_ON 1 												// RTW shaders ON/OFF switch /// SEPARATE_BLOOM and SET_BLOOM_KYOUKI must be 0
+#define RTW_BLOOMINGNESS 0.2f 									// default for rtw was 3.5f - but 0.2 works well
+#define DOPE_ON 0												// dopefish setup switch /// SEPARATE_BLOOM and SET_BLOOM_KYOUKI must be 0
+
+/** FOG SECTION **/
+#define SET_FOG 1												// 0 will remove distance fog. (1 by default) == OLD METHOD
+#define FOG_DISTANCE 100.0										// distance in [m] - its for default fog
+#define FOG_DISTANCE_4L 1.0										// distance in [m] - its for default fog
+#define SET_NOFOG_KYOUKI 0										// 1 will remove distance fog. 0 default
+// luminance vector RGB
+#define LUMINANCE_V_RTW float3(0.3, 0.59, 0.11)					// SET RTW LUMINANCE
+#define LUMINANCE_V 	float3(0.3, 0.3, 0.2)					// 1 will remove distance fog. 0 default
+
+
+/** BLOOM SECTION **/
+#define SEPARATE_BLOOM 0										// use separate bloom
+#define SET_BLOOM_KYOUKI 0										// special Kyouki bloom without actual bloom and bof effect
+
+/** CROSSHAIR SECTION **/
+#define SET_CROSSHAIR 1											// Enable the crosshair shader. Additional changes have to be done in the CrosshairSettings.usf file. (0 by default)
+#define ENABLE_CROSSHAIR 1
+#define ENABLE_CROSSHAIR_DOT_1 1
+#define ENABLE_CROSSHAIR_DOT_2 0
+	// 0.0-100.0 where 100 means scan 100% of the screen - tu cut scan areas
+#define CROSSHAIR_PIXEL_SCAN_LIMIT 8.0
+	// Dot 1 shape settings
+#define CROSSHAIR_DOT_1_SIZE .8
+#define IN_CROSSHAIR_DOT_1_COLOR  float4(0.0, 1.0, 0.0, 1.0) 	// R, G, B, Alpha with a range of 0.0 to 1.0 Insides
+#define OUT_CROSSHAIR_DOT_1_COLOR float4(0.0, 0.0, 0.0, 1.0)	// R, G, B, Alpha with a range of 0.0 to 1.0 Outsides
+#define IN_CROSSHAIR_DOT_1_DYNAMIC_COLOR 0 						// inverse color of background ignores rgb
+#define OUT_CROSSHAIR_DOT_1_DYNAMIC_COLOR 0						// inverse color of background ignores rgb
+// Blizzie dot shape settings (strange dot)
+#define CROSSHAIR_DOT_2_COLOR float4(1.0, 0.0, 0.0, 0.75) // R, G, B, Alpha with a range of 0.0 to 1.0
+
+/** OUTLINE SECTION **/
+#define SET_OUTLINE 0		// Enable the outline shader. Additional changes have to be done in the OutlinePixelShaderSettings.usf file. (0 by default)
+#define OUTLINE_DRAW_EDGE 1
+#define OUTLINE_DRAW_OUTSIDE 0
+#define OUTLINE_DRAW_INSIDE 0
+#define OUTLINE_GAP 0.3
+#define OUTLINE_MAXDISTANCE 1000.0
+#define OUTLINE_ENABLE_ANTIALIASING 1
+#define OUTLINE_ENABLE_DYNAMIC_THICKNESS 0
+#define OUTLINE_DYNAMIC_THICKNESS_SCALE 1000.0
+// Red, Green, Blue - ranges from 0.0 to 1.0
+// OUTLINE_COLOR is the global color
+#define OUTLINE_EDGE_COLOR float3( 0.0, 0.0, 0.0 )
+#define OUTLINE_OUTSIDE_COLOR float3( 0.0, 0.0, 0.0 )
+#define OUTLINE_INSIDE_COLOR float3( 0.0, 0.0, 0.0 )
+
+
+/** Inprogress Section **/
+//#define SET_BLOOM 1 		// Bloom: 1 = On, 0 = Off
+//#define SET_NOBLOOM 1 	// Bloom test new value
+
+// Colorgrading, 0 will remove the blue tint color grading. (1 by default)
+//#define SET_COLORGRADING 0
+// if statements = 1
+// else = 0
+
+/** changes **\
+// New nofogging method, compelely removes fog and does not reduce fps.
+// added RTW setup with blooming settings to tweak it to ur needs
+// dopefish tonemap :)
+
+
+
+*/

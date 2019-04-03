@@ -1,0 +1,156 @@
+/***************************************************************************************
+ * TESLayerShader.usf
+ * ------------------
+ *
+ * Shader that performs the layer rendering pass
+ * (perspective and orthogonal projections)
+ *
+ * OWNER: Maurizio Sciglio 27/01/2006
+ *
+ * ---Amendments-----
+ *
+ * (c) 2006 Real Time Worlds, Ltd.
+ ****************************************************************************************/
+
+#include "Common.usf"
+#include "Material.usf"
+#include "VertexFactory.usf"
+
+float3x3	TransformMatrix;
+float3		Direction;
+
+// Pixel shaders parameters
+sampler		LayerTexture; 
+sampler		DepthTexture;
+sampler		MaskTexture;
+float4		LayerColour;
+float		SlopeThreshold;
+float		DepthBias;
+
+float		MaskUsage; // <0 : Inverted, >0 : Normal
+
+struct vertexShaderOutput
+{
+	FVertexFactoryInterpolants  OutFactoryInterpolants;
+
+	float2		ProjectedTexCoords		: TEXCOORD4;
+	float2		TransformedTexCoords	: TEXCOORD5;					
+	float		Depth					: TEXCOORD6;
+	float3		TangentDirection		: TEXCOORD7;
+	float4		Position				: POSITION;		
+};
+
+vertexShaderOutput vertexShader(FVertexFactoryInput Input)
+{
+	vertexShaderOutput Result;
+	
+	// Vertex position in texture space
+	Result.Position = float4( Input.TexCoords[0].x * 2.0f - 1.0f, 
+	                        -(Input.TexCoords[0].y * 2.0f - 1.0f), 
+	                          0.0f, 
+	                          1.0f);
+	
+	// Normalised device coordinates
+	float4 ndcPosition = MulMatrix(ViewProjectionMatrix,VertexFactoryGetWorldPosition(Input));
+	Result.OutFactoryInterpolants = VertexFactoryGetInterpolants(Input);
+
+	// Compute vertex's distance from the point of view (biased)
+	Result.Depth = ndcPosition.z / ndcPosition.w - DepthBias;	
+	
+	float3 ProjectedPosition = float3( ndcPosition.xy / ndcPosition.w, 1.0f );
+			
+	// Texture coordinates for projective texturing
+	Result.ProjectedTexCoords = float2( 0.5 * ProjectedPosition.x + 0.5,
+	                                   -0.5 * ProjectedPosition.y + 0.5 );
+	
+	// Compute the projection direction in tangent space
+	float3x3 TangentBasis = VertexFactoryGetTangentBasis(Input);
+	Result.TangentDirection = VertexFactoryWorldToTangentSpace(Input,TangentBasis,Direction);
+	
+	// Apply layer's transformations	
+	Result.TransformedTexCoords = MulMatrix(TransformMatrix, ProjectedPosition);		
+	Result.TransformedTexCoords.x =  0.5 * Result.TransformedTexCoords.x + 0.5;
+	Result.TransformedTexCoords.y = -0.5 * Result.TransformedTexCoords.y + 0.5;	
+		                            
+	return Result;
+}
+
+float RetMaskValue(float2 TexCoords)
+{
+	float maskValue = tex2D(MaskTexture,TexCoords).r;
+	return (MaskUsage>0.0f) ? maskValue : 1-maskValue;
+}
+
+float4 pixelShaderBlendingAlpha(FVertexFactoryInterpolants	FactoryInterpolants,
+								float2 ProjectedTexCoords	: TEXCOORD4,
+								float2 TransformedTexCoords	: TEXCOORD5,
+								float  Depth				: TEXCOORD6,
+								float3 TangentDirection		: TEXCOORD7 ) : COLOR0
+{
+	FMaterialParameters MaterialParameters = GetMaterialParameters(FactoryInterpolants);
+	
+	float maskValue = RetMaskValue(MaterialParameters.TexCoords[0]);
+	
+	// Get the value from depth map
+	float TexDepth = tex2D(DepthTexture, ProjectedTexCoords).r;
+	
+	// Discard the current pixel if not visible	
+	clip(Depth);
+	clip(TexDepth-Depth);
+	
+	// Check the slope threshold	
+	float SlopeAngle = normalize(-TangentDirection).z; // Equivalent to dot( normalize(-TangentDirection),float3(0,0,1) )
+	clip(SlopeAngle-SlopeThreshold);
+
+	float4 decalColour = tex2D(LayerTexture,TransformedTexCoords);
+	
+	return float4(LayerColour.rgb * decalColour.rgb * LayerColour.a * decalColour.a, LayerColour.a * decalColour.a * maskValue);	
+}
+
+float4 pixelShaderBlendingMultiplicative(FVertexFactoryInterpolants		FactoryInterpolants,
+										 float2 ProjectedTexCoords		: TEXCOORD4,
+										 float2 TransformedTexCoords	: TEXCOORD5,
+										 float  Depth					: TEXCOORD6,
+										 float3 TangentDirection		: TEXCOORD7 ) : COLOR0
+{
+	FMaterialParameters MaterialParameters = GetMaterialParameters(FactoryInterpolants);
+	
+	float maskValue = RetMaskValue(MaterialParameters.TexCoords[0]);
+	
+	// Get the value from depth map
+	float TexDepth = tex2D(DepthTexture, ProjectedTexCoords).r;
+	
+	// Discard the current pixel if not visible
+	clip(Depth);
+	clip(TexDepth-Depth);
+	
+	// Check the slope threshold
+	float SlopeAngle = normalize(-TangentDirection).z; // Equivalent to dot( normalize(-TangentDirection),float3(0,0,1) )
+	clip(SlopeAngle-SlopeThreshold);	
+	
+	return float4(tex2D(LayerTexture,TransformedTexCoords).a * tex2D(LayerTexture,TransformedTexCoords).rgb * LayerColour.rgb * LayerColour.a * maskValue + 1 - LayerColour.a * tex2D(LayerTexture,TransformedTexCoords).a * maskValue, 1.0f);	
+}
+
+float4 pixelShaderBlendingAdditive(FVertexFactoryInterpolants	FactoryInterpolants,
+								   float2 ProjectedTexCoords	: TEXCOORD4,
+								   float2 TransformedTexCoords	: TEXCOORD5,
+								   float  Depth					: TEXCOORD6,
+								   float3 TangentDirection		: TEXCOORD7 ) : COLOR0
+{
+	FMaterialParameters MaterialParameters = GetMaterialParameters(FactoryInterpolants);
+	
+	float maskValue = RetMaskValue(MaterialParameters.TexCoords[0]);
+	
+	// Get the value from depth map
+	float TexDepth = tex2D(DepthTexture, ProjectedTexCoords).r;
+	
+	// Discard the current pixel if not visible
+	clip(Depth);
+	clip(TexDepth-Depth);
+	
+	// Check the slope threshold
+	float SlopeAngle = normalize(-TangentDirection).z; // Equivalent to dot( normalize(-TangentDirection),float3(0,0,1) )
+	clip(SlopeAngle-SlopeThreshold);	
+	
+	return float4(tex2D(LayerTexture,TransformedTexCoords).rgb * LayerColour.rgb * LayerColour.a * maskValue, 1.0f);
+}

@@ -1,0 +1,23 @@
+/*=============================================================================
+	PositionOnlyDepthOnlyVertexShader.hlsl: Depth-only vertex shader.
+	Copyright 1998-2008 Epic Games, Inc. All Rights Reserved.
+=============================================================================*/
+
+#include "Common.usf"
+#include "Material.usf"
+#include "VertexFactory.usf"
+
+void Main(
+	FPositionOnlyVertexFactoryInput Input,
+// APB(SJT): Output pixel position for the pixel shader. +
+	out float4 PixelPosition : TEXCOORD5,
+// APB(SJT) -
+	out float4 OutPosition : POSITION)
+{
+	float4 WorldPos = VertexFactoryGetWorldPosition(Input);
+	OutPosition = MulMatrix(ViewProjectionMatrix,WorldPos);
+
+// APB(SJT): Output pixel position for the pixel shader. +
+	PixelPosition = OutPosition;
+// APB(SJT) -
+}
