@@ -77,7 +77,13 @@ void FourLayerMain(
 		float3	WorldPosition = ScreenVector.xyz * ClampedSceneDepth; // calculate the world position using the deprojected screen vector by multiplying with scene w
 		float4	MinHeightPercent = LinePlaneIntersection4(WorldPosition.z,MinHeightRelativeZ); // maxfog - camera / z height
 		float4	MaxHeightPercent = LinePlaneIntersection4(WorldPosition.z,MaxHeightRelativeZ); // minfog - camera / z height
-		float4	LayerDistance = max(float4(0,0,0,0),ClampedSceneDepth.xxxx - FogStartDistance) * abs(saturate(MaxHeightPercent) - saturate(MinHeightPercent)); // fog layer distance based on % over max/min fog heights
+		#if SET_FOG
+			float4 LayerDistance = max(float4(0,0,0,0),ClampedSceneDepth.xxxx - FogStartDistance) * FOG_DISTANCE_4L;//abs(saturate(MaxHeightPercent) - saturate(MinHeightPercent)) * ( FOG_DISTANCE_4L / 100.0 ); // fog layer distance based on % over max/min fog heights
+		#else
+			float4 LayerDistance = max(float4(0,0,0,0),ClampedSceneDepth.xxxx - FogStartDistance) * abs(saturate(MaxHeightPercent) - saturate(MinHeightPercent)); // fog layer distance based on % over max/min fog heights
+		#endif
+
+		//float4	LayerDistance = max(float4(0,0,0,0),ClampedSceneDepth.xxxx - FogStartDistance) * abs(saturate(MaxHeightPercent) - saturate(MinHeightPercent)) * ; // fog layer distance based on % over max/min fog heights
 		float4	Scattering = LayerDistance < FogExtinctionDistance ? exp2(FogDistanceScale * LayerDistance) : float4(0,0,0,0); // clamp anything beyond the extinction distance to 0 scattering		
 		float4	InScattering = Scattering - 1; // ratio of the inscattering color to be used
 
