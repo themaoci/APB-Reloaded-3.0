@@ -1,8 +1,8 @@
 # APB Reloaded Configs
 
-Just throw my files:
-/APBGame/Config/*.*
-/Engine/Config/*.* (this one overrides the APBGame commands)
+- Just throw my files:
+- /APBGame/Config/xxxxx
+- /Engine/Config/xxxxx (this one overrides the APBGame commands)
 
 
 Made by TheMaoci
