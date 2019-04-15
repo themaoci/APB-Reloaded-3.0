@@ -1,6 +1,6 @@
 # APB Reloaded Configs
 
- `-NoVerifyGC` -> helps with lags ;)
+ `-NoVerifyGC` -> helps with lags ;) - use for performance config cause i turn off garbage collector from there
 
 - Just throw my files:
 - /APBGame/Config/xxxxx
