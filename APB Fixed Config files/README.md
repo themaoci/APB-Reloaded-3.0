@@ -1,5 +1,7 @@
 # APB Reloaded Configs
 
+ `-NoVerifyGC` -> helps with lags ;)
+
 - Just throw my files:
 - /APBGame/Config/xxxxx
 - /Engine/Config/xxxxx (this one overrides the APBGame commands)
