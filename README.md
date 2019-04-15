@@ -14,7 +14,7 @@ Final version of Shaders, I will not work anymore at them it will be waste of my
 \
 \
 _Info about StreamedSFX maded by Ketchup_\
-_Download link: https://www23.zippyshare.com/v/lHxephX5/file.html_
+_Download link: https://www23.zippyshare.com/v/lHxephX5/file.html_ ( Mirror: https://anonfile.com/G1TaP2d4n3/StreamedSFX_pck )
 - this file is custom maded By Ketchup - Required Polish language understanding :)
 - was made only for lauch purposes ( funny texts replacements )
 - Watch out its against the TOS ( but its not giving any advantage - the only files who was changed was the Joker Store - it was about ~50 of them ... )
