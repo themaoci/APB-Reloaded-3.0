@@ -6,7 +6,7 @@ Final version of Shaders, I will not work anymore at them it will be waste of my
 \
 ##PS Specs
 - AMD FX-8320
-- R9 270X - 4GB
+- R9 270X - 4GB now switched to 1050Ti (with 0.47% bottleneck)
 - 16GB Ram (should be 2400MHz)
 - PCIe SSD for windows and APB
 - 7200 HDD 2TB for other files
